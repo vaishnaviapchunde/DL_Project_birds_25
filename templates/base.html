@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Birds of India{% endblock %} · Bird Classifier</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Domine:wght@500;700&family=Nunito+Sans:wght@400;600;700;800&display=swap">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="nav">
+        <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">B</span>Birds of India</a>
+        <nav>
+            <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">Home</a>
+            <a href="{{ url_for('predict') }}" class="{{ 'active' if request.endpoint == 'predict' }}">Identify</a>
+            <a href="{{ url_for('metrics') }}" class="{{ 'active' if request.endpoint == 'metrics' }}">Model performance</a>
+        </nav>
+    </header>
+
+    <main>{% block content %}{% endblock %}</main>
+
+    <footer class="footer">MobileNetV3-Large · trained on Birds-25 (Kaggle) · PyTorch + Flask</footer>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

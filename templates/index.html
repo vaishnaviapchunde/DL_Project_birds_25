@@ -1,217 +1,81 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bird Image Classifier</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(to bottom, #e8f5e9, #c8e6c9); /* Subtle green gradient */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-
-        .result-container {
-            background-color: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            width: 90%;
-            max-width: 500px;
-            margin: 0 auto;  /* Centers the result container */
-        }
-
-        .result-container img {
-            max-width: 80%;
-            height: auto;
-            margin: 0 auto;
-            display: block;
-        }
-
-        .container {
-            display: flex;
-            flex-direction: row;
-            justify-content: space-between;
-            width: 90%;
-            max-width: 1200px;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
-            background-color: white;
-        }
-
-        .left-section,
-        .right-section {
-            padding: 20px;
-            flex: 1;
-        }
-
-        .left-section {
-            background: url('https://www.transparenttextures.com/patterns/swirl.png'), linear-gradient(to bottom, #81c784, #a5d6a7);
-            text-align: center;
-            color: #2e7d32;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .left-section h1 {
-            font-size: 2em;
-            margin-bottom: 20px;
-        }
-
-        .left-section form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        input[type="file"] {
-            padding: 10px;
-            font-size: 1em;
-            border: 2px solid #66bb6a;
-            border-radius: 8px;
-            transition: border-color 0.3s;
-        }
-
-        input[type="file"]:focus {
-            border-color: #388e3c;
-            outline: none;
-        }
-
-        button {
-            background-color: #388e3c;
-            color: white;
-            border: none;
-            padding: 12px;
-            font-size: 1.1em;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: transform 0.2s, background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: #2e7d32;
-            transform: translateY(-3px);
-        }
-
-        .right-section {
-            background-color: #e8f5e9;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .right-section img {
-            max-width: 80%;
-            height: auto;
-            margin: 0 auto;
-            display: block;
-            border-radius: 12px;
-        }
-        
-        .right-section .prediction {
-            font-size: 1.5em;
-            color: #2e7d32;
-            margin-bottom: 10px;
-        }
-
-        .right-section .scientific-name {
-            font-size: 1.2em;
-            font-style: italic;
-            color: #4caf50;
-            margin-bottom: 10px;
-        }
-
-        .right-section .description {
-            font-size: 1em;
-            color: #555;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 10px;
-            margin-top: 20px;
-            background-color: transparent;
-            font-size: 1em;
-            color: #388e3c;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="left-section">
-            <h1>Upload Bird Image</h1>
-            <form id="uploadForm" enctype="multipart/form-data">
-                <input type="file" id="file" name="file" accept="image/*" required>
-                <button type="submit">Submit</button>
-            </form>
-        </div>
-        <div class="right-section">
-            <div id="output">
-                <img id="uploadedImage" alt="Uploaded Bird Image" style="display: none;">
-                <div id="prediction" class="prediction"></div>
-                <div id="scientificName" class="scientific-name"></div>
-                <div id="description" class="description"></div>
-                <img id="birdImage" alt="Bird Image" style="display: none; margin-top: 10px; border-radius: 12px;">
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<section class="hero">
+    <div class="hero-inner">
+        <div>
+            <span class="eyebrow">Deep learning · MobileNetV3</span>
+            <h1>Identify Indian birds from a <em>single photo</em></h1>
+            <p>Upload a picture and our fine-tuned convolutional neural network tells you which of 25 common Indian species it is, along with its scientific name and a short profile.</p>
+            <div class="hero-actions">
+                <a class="btn btn-primary" href="{{ url_for('predict') }}">Identify a bird →</a>
+                <a class="btn btn-ghost" href="{{ url_for('metrics') }}">See model performance</a>
             </div>
         </div>
+        <div class="collage">
+            <img src="{{ url_for('static', filename='images/hoopoe.jpg') }}" alt="Hoopoe">
+            <img src="{{ url_for('static', filename='images/indian_pitta.jpg') }}" alt="Indian Pitta">
+            <img src="{{ url_for('static', filename='images/coppersmith_barbet.jpg') }}" alt="Coppersmith Barbet">
+            <img src="{{ url_for('static', filename='images/gray_wagtail.jpg') }}" alt="Gray Wagtail">
+        </div>
     </div>
-    <footer class="footer">
-        Powered by MobileNetV3 - Bird Classifier
-    </footer>
-    <script>
-        document.getElementById('uploadForm').onsubmit = function(event) {
-            event.preventDefault();
-            const fileInput = document.getElementById('file');
-            const file = fileInput.files[0];
+</section>
 
-            if (!file) {
-                alert("Please select a file.");
-                return;
-            }
+<div class="section" style="padding-top:0; padding-bottom:0">
+    <div class="stats card">
+        <div class="stat"><b>25</b><span>bird species</span></div>
+        <div class="stat"><b>98.65%</b><span>test accuracy</span></div>
+        <div class="stat"><b>45,330</b><span>images in dataset</span></div>
+        <div class="stat"><b>4.2 M</b><span>model parameters</span></div>
+    </div>
+</div>
 
-            // Display uploaded image
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById("uploadedImage").src = e.target.result;
-                document.getElementById("uploadedImage").style.display = "block";
-            };
-            reader.readAsDataURL(file);
+<section class="section">
+    <span class="eyebrow">How it works</span>
+    <h2 class="section-title">From photo to species in three steps</h2>
+    <div class="steps">
+        <div class="step card">
+            <div class="step-num">1</div>
+            <h3>Upload a photo</h3>
+            <p>Drop in any bird picture: JPG, PNG or WebP.</p>
+        </div>
+        <div class="step card">
+            <div class="step-num">2</div>
+            <h3>The model looks closely</h3>
+            <p>The image is resized to 224 × 224 and passed through MobileNetV3, fine-tuned on 29,000+ labelled photos.</p>
+        </div>
+        <div class="step card">
+            <div class="step-num">3</div>
+            <h3>Get the answer</h3>
+            <p>See the species, how confident the model is, and its top 3 guesses.</p>
+        </div>
+    </div>
+</section>
 
-            // Prepare form data and send request to backend
-            const formData = new FormData();
-            formData.append("file", file);
+<section class="section" style="padding-top:0">
+    <span class="eyebrow">The species</span>
+    <h2 class="section-title">25 birds the model knows</h2>
+    <p class="lead">Every species in the Birds-25 dataset, from backyard regulars to wetland giants.</p>
+    <div class="gallery">
+        {% for bird in birds %}
+        <article class="bird card">
+            <img src="{{ url_for('static', filename='images/' ~ bird.image) }}" alt="{{ bird.name }}" loading="lazy">
+            <div>
+                <h3>{{ bird.name }}</h3>
+                <i>{{ bird.scientific_name }}</i>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
 
-            fetch("/predict", {
-                method: "POST",
-                body: formData
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                    } else {
-                        document.getElementById("prediction").textContent = `Prediction: ${data.prediction}`;
-                        document.getElementById("scientificName").textContent = `Scientific Name: ${data.scientific_name}`;
-                        document.getElementById("description").textContent = `Description: ${data.description}`;
-                        document.getElementById("birdImage").src = `/static/images/${data.image}`;
-                        document.getElementById("birdImage").style.display = "block";
-                    }
-                })
-                .catch(error => {
-                    console.error("Error:", error);
-                    alert("Something went wrong. Please try again.");
-                });
-        };
-    </script>
-</body>
-</html>
+<section class="section" style="padding-top:0">
+    <div class="cta">
+        <div>
+            <h2>Spotted a bird today?</h2>
+            <p>Find out what it is in a couple of seconds.</p>
+        </div>
+        <a class="btn btn-primary" href="{{ url_for('predict') }}">Try it now →</a>
+    </div>
+</section>
+{% endblock %}

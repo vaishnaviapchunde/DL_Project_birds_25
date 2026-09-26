@@ -195,11 +195,17 @@ class_names = list(bird_info.keys())
 
 @app.route('/')
 def index():
-    # Serve the HTML frontend
-    return render_template('index.html')
+    return render_template('index.html', birds=bird_info.values())
 
-@app.route('/predict', methods=['POST'])
+@app.route('/metrics')
+def metrics():
+    return render_template('metrics.html')
+
+@app.route('/predict', methods=['GET', 'POST'])
 def predict():
+    if request.method == 'GET':
+        return render_template('predict.html')
+
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -209,28 +215,25 @@ def predict():
 
     try:
         # Open the image and preprocess
-        img = Image.open(io.BytesIO(file.read()))
+        img = Image.open(io.BytesIO(file.read())).convert('RGB')  # grayscale/RGBA -> 3 channels
         img = transform(img).unsqueeze(0).to(device)
 
         # Make the prediction
         with torch.no_grad():
-            outputs = model(img)
-            _, predicted = torch.max(outputs, 1)
+            probs = torch.softmax(model(img), dim=1)[0]
+        top_probs, top_idx = probs.topk(3)
 
-        class_index = predicted.item()
-
-        if class_index >= len(class_names):
-            return jsonify({"error": "Predicted class index out of range"}), 500
-
-        predicted_class = class_names[class_index]
-        bird_details = bird_info[predicted_class]
+        bird_details = bird_info[class_names[top_idx[0].item()]]
 
         # Return prediction details as JSON
         return jsonify({
             "prediction": bird_details['name'],
             "scientific_name": bird_details['scientific_name'],
             "description": bird_details['description'],
-            "image": bird_details['image']
+            "image": bird_details['image'],
+            "confidence": round(top_probs[0].item(), 4),
+            "top3": [{"name": bird_info[class_names[i]]['name'], "confidence": round(p, 4)}
+                     for p, i in zip(top_probs.tolist(), top_idx.tolist())]
         })
 
     except Exception as e:

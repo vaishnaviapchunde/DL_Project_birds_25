@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Identify{% endblock %}
+{% block content %}
+<section class="section">
+    <span class="eyebrow">Identify</span>
+    <h2 class="section-title">Which bird is this?</h2>
+    <p class="lead">Upload a clear photo of a single bird. The model knows 25 common Indian species.</p>
+
+    <div class="predict-grid">
+        <form id="uploadForm" class="panel card">
+            <label class="dropzone" id="dropzone">
+                <input type="file" id="file" name="file" accept="image/*" required>
+                <div class="icon">⬆</div>
+                <strong>Drop a photo here</strong>
+                <small>or click to browse · JPG, PNG, WebP</small>
+                <img id="preview" class="hidden" alt="Your uploaded photo">
+            </label>
+            <div class="file-row">
+                <span class="file-name" id="fileName">No file chosen</span>
+                <button class="btn btn-dark" id="submitBtn" type="submit" disabled>Identify bird</button>
+            </div>
+        </form>
+
+        <div class="panel card" aria-live="polite">
+            <div class="empty" id="emptyState">
+                <div class="icon">🔍</div>
+                <strong>Your result will appear here</strong>
+                <span>Choose a photo and press “Identify bird”.</span>
+            </div>
+            <div class="empty hidden" id="loading">
+                <div class="spinner"></div>
+                <span>Looking closely at the feathers…</span>
+            </div>
+            <div class="hidden" id="result">
+                <div class="result-head">
+                    <div>
+                        <h2 id="prediction"></h2>
+                        <p class="sci" id="scientificName"></p>
+                    </div>
+                    <span class="badge" id="confidence"></span>
+                </div>
+                <p class="desc" id="description"></p>
+                <div class="warn hidden" id="lowWarn">The model isn't sure. The photo may be unclear, or the bird may not be one of the 25 species it knows.</div>
+                <p class="sub">Top 3 guesses</p>
+                <div id="top3"></div>
+                <div class="ref">
+                    <img id="birdImage" alt="">
+                    <p>Reference photo of the predicted species from the training dataset.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const $ = id => document.getElementById(id);
+    const fileInput = $('file'), dropzone = $('dropzone');
+    const show = which => ['emptyState', 'loading', 'result'].forEach(id => $(id).classList.toggle('hidden', id !== which));
+    const pct = x => (x * 100).toFixed(1) + '%';
+
+    function setFile(file) {
+        if (!file) return;
+        $('fileName').textContent = file.name;
+        $('submitBtn').disabled = false;
+        $('preview').src = URL.createObjectURL(file);
+        $('preview').classList.remove('hidden');
+    }
+
+    fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+    ['dragenter', 'dragover'].forEach(e => dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(e => dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.remove('drag'); }));
+    dropzone.addEventListener('drop', ev => {
+        fileInput.files = ev.dataTransfer.files;
+        setFile(fileInput.files[0]);
+    });
+
+    $('uploadForm').addEventListener('submit', async ev => {
+        ev.preventDefault();
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        show('loading');
+        $('submitBtn').disabled = true;
+        try {
+            const res = await fetch("{{ url_for('predict') }}", { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            $('prediction').textContent = data.prediction;
+            $('scientificName').textContent = data.scientific_name;
+            $('description').textContent = data.description;
+            $('confidence').textContent = pct(data.confidence) + ' confident';
+            $('confidence').classList.toggle('low', data.confidence < 0.6);
+            $('lowWarn').classList.toggle('hidden', data.confidence >= 0.6);
+            $('birdImage').src = '/static/images/' + data.image;
+            $('birdImage').alt = 'Reference photo of ' + data.prediction;
+
+            $('top3').innerHTML = '';
+            data.top3.forEach(g => {
+                const row = document.createElement('div');
+                row.className = 'bar-row';
+                row.innerHTML = '<div></div><span></span><div class="bar"><i></i></div>';
+                row.children[0].textContent = g.name;
+                row.children[1].textContent = pct(g.confidence);
+                $('top3').appendChild(row);
+                requestAnimationFrame(() => row.querySelector('i').style.width = pct(g.confidence));
+            });
+            show('result');
+        } catch (err) {
+            show('emptyState');
+            alert('Could not identify the image: ' + err.message);
+        } finally {
+            $('submitBtn').disabled = false;
+        }
+    });
+</script>
+{% endblock %}

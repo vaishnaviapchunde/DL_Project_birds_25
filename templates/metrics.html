@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Model performance{% endblock %}
+{% block content %}
+<section class="section">
+    <span class="eyebrow">Model performance</span>
+    <h2 class="section-title">How well does the model work?</h2>
+    <p class="lead">Training history from our four experiments, and a full evaluation of the deployed model on 7,500 test images it never saw during training.</p>
+
+    <div class="kpis">
+        <div class="kpi card"><b id="kAcc">–</b><span>test accuracy</span></div>
+        <div class="kpi card"><b id="kLoss">–</b><span>test loss</span></div>
+        <div class="kpi card"><b id="kF1">–</b><span>macro F1 score</span></div>
+        <div class="kpi card"><b>4.2 M</b><span>parameters</span></div>
+    </div>
+
+    <span class="eyebrow">Training history</span>
+    <h2 class="section-title" style="font-size:28px">Accuracy and loss per epoch</h2>
+    <div class="tabs" id="tabs"></div>
+    <div class="charts">
+        <div class="chart card">
+            <h3>Accuracy</h3>
+            <div class="legend"><span><i style="background:#2F7F74"></i>Train</span><span><i style="background:#D9822B"></i>Validation</span></div>
+            <div id="accChart"></div>
+        </div>
+        <div class="chart card">
+            <h3>Loss</h3>
+            <div class="legend"><span><i style="background:#2F7F74"></i>Train</span><span><i style="background:#D9822B"></i>Validation</span></div>
+            <div id="lossChart"></div>
+        </div>
+    </div>
+
+    <span class="eyebrow">Experiments</span>
+    <h2 class="section-title" style="font-size:28px">Comparing the four runs</h2>
+    <div class="card table-wrap" style="margin-bottom:40px">
+        <table class="data">
+            <thead><tr><th>Run</th><th class="num">Final train acc</th><th class="num">Best val acc</th><th class="num">Test acc</th><th class="num">Test loss</th></tr></thead>
+            <tbody id="runTable"></tbody>
+        </table>
+    </div>
+
+    <span class="eyebrow">Confusion matrix</span>
+    <h2 class="section-title" style="font-size:28px">Where the deployed model gets confused</h2>
+    <p class="lead">Rows are the true species, columns the predicted species (numbered in the same order). Green cells on the diagonal are correct predictions; orange cells are mistakes. Hover a cell for details.</p>
+    <div class="card cm-wrap" style="margin-bottom:40px">
+        <div class="cm" id="cm"></div>
+        <div class="cm-note">
+            <span><i style="background:#2F7F74"></i>correct (darker = more)</span>
+            <span><i style="background:#D9822B"></i>misclassified (darker = more)</span>
+        </div>
+    </div>
+
+    <span class="eyebrow">Per species</span>
+    <h2 class="section-title" style="font-size:28px">Scores for each bird, hardest first</h2>
+    <div class="card table-wrap">
+        <table class="data">
+            <thead><tr><th>Species</th><th class="num">Correct</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">F1 score</th></tr></thead>
+            <tbody id="classTable"></tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const pct = (x, d = 2) => (x * 100).toFixed(d) + '%';
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+    // Simple SVG line chart: series = [{values, color}]
+    function lineChart(target, series, fmt, fixedMin, maxCap = Infinity) {
+        const W = 560, H = 280, L = 56, R = 12, T = 10, B = 34;
+        const all = series.flatMap(s => s.values);
+        let lo = fixedMin ?? Math.min(...all), hi = Math.max(...all);
+        const pad = (hi - lo) * 0.08 || 0.01;
+        lo = fixedMin ?? lo - pad; hi = Math.min(hi + pad, maxCap);
+        const n = series[0].values.length;
+        const x = i => L + i * (W - L - R) / (n - 1);
+        const y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+        let svg = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+        for (let k = 0; k <= 4; k++) {
+            const v = lo + (hi - lo) * k / 4, yy = y(v);
+            svg += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#E4DECF"/><text x="${L - 8}" y="${yy + 4}" text-anchor="end">${fmt(v)}</text>`;
+        }
+        [1, 5, 10, 15, 20].filter(e => e <= n).forEach(e => svg += `<text x="${x(e - 1)}" y="${H - 10}" text-anchor="middle">${e}</text>`);
+        svg += `<text x="${W - R}" y="${H - 10}" text-anchor="end" dx="-40">epoch</text>`;
+        series.forEach(s => {
+            const pts = s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+            svg += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="3" stroke-linejoin="round"/>`;
+            s.values.forEach((v, i) => svg += `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${s.color}"><title>Epoch ${i + 1}: ${fmt(v)}</title></circle>`);
+        });
+        target.innerHTML = svg + '</svg>';
+    }
+
+    fetch("{{ url_for('static', filename='metrics.json') }}").then(r => r.json()).then(m => {
+        const dep = m.deployed, runs = m.runs, deployedRun = runs[runs.length - 1];
+        const f1s = dep.per_class.map(c => c.f1);
+        document.getElementById('kAcc').textContent = pct(dep.test_acc);
+        document.getElementById('kLoss').textContent = deployedRun.test_loss.toFixed(3);
+        document.getElementById('kF1').textContent = (f1s.reduce((a, b) => a + b) / f1s.length).toFixed(3);
+
+        // Tabs + curves
+        const tabs = document.getElementById('tabs');
+        function showRun(i) {
+            const r = runs[i];
+            [...tabs.children].forEach((t, j) => t.classList.toggle('active', j === i));
+            lineChart(document.getElementById('accChart'), [{ values: r.train_acc, color: '#2F7F74' }, { values: r.val_acc, color: '#D9822B' }], v => pct(v, 1), undefined, 1);
+            lineChart(document.getElementById('lossChart'), [{ values: r.train_loss, color: '#2F7F74' }, { values: r.val_loss, color: '#D9822B' }], v => v.toFixed(2), 0);
+        }
+        runs.forEach((r, i) => { const b = el('button', 'tab', r.name); b.type = 'button'; b.onclick = () => showRun(i); tabs.appendChild(b); });
+        showRun(runs.length - 1);
+
+        // Run comparison
+        const best = Math.max(...runs.map(r => r.test_acc));
+        runs.forEach(r => {
+            const tr = el('tr', r.test_acc === best ? 'best' : '');
+            [r.name, pct(r.train_acc.at(-1)), pct(Math.max(...r.val_acc)), pct(r.test_acc), r.test_loss.toFixed(3)]
+                .forEach((v, j) => tr.appendChild(el('td', j ? 'num' : '', v)));
+            document.getElementById('runTable').appendChild(tr);
+        });
+
+        // Confusion matrix heatmap
+        const cm = document.getElementById('cm'), n = m.classes.length;
+        const maxOff = Math.max(1, ...dep.confusion.flatMap((row, i) => row.filter((_, j) => j !== i)));
+        cm.appendChild(el('div'));
+        for (let j = 0; j < n; j++) cm.appendChild(el('div', 'col', j + 1));
+        dep.confusion.forEach((row, i) => {
+            const total = row.reduce((a, b) => a + b);
+            cm.appendChild(el('div', 'lbl', `${i + 1}. ${m.classes[i]}`));
+            row.forEach((v, j) => {
+                const c = el('div', 'cell', v || '');
+                if (i === j) {
+                    c.style.background = `rgba(47,127,116,${(v / total).toFixed(2)})`;
+                    c.style.color = '#fff';
+                } else if (v) {
+                    c.style.background = `rgba(217,130,43,${(0.3 + 0.7 * v / maxOff).toFixed(2)})`;
+                }
+                c.title = `True: ${m.classes[i]}\nPredicted: ${m.classes[j]}\n${v} image${v === 1 ? '' : 's'}`;
+                cm.appendChild(c);
+            });
+        });
+
+        // Per-class table, hardest first
+        dep.per_class.map((c, i) => ({ ...c, name: m.classes[i], correct: dep.confusion[i][i], total: dep.confusion[i].reduce((a, b) => a + b) }))
+            .sort((a, b) => a.f1 - b.f1)
+            .forEach(c => {
+                const tr = el('tr');
+                tr.appendChild(el('td', '', c.name));
+                tr.appendChild(el('td', 'num', `${c.correct} / ${c.total}`));
+                tr.appendChild(el('td', 'num', c.precision.toFixed(3)));
+                tr.appendChild(el('td', 'num', c.recall.toFixed(3)));
+                const f = el('td', 'num', c.f1.toFixed(3));
+                f.innerHTML += `<span class="mini"><i style="width:${c.f1 * 100}%"></i></span>`;
+                tr.appendChild(f);
+                document.getElementById('classTable').appendChild(tr);
+            });
+    });
+</script>
+{% endblock %}
