@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bird Image Classifier</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to right, #e0f7fa, #a7ffeb); /* Soft green gradient background */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #444;
+        }
+
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            transition: transform 0.3s;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+        }
+
+        h1 {
+            color: #388e3c; /* Dark green color */
+            font-size: 2em;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        label {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            display: block;
+            color: #555;
+        }
+
+        input[type="file"] {
+            padding: 12px;
+            font-size: 1em;
+            margin-bottom: 20px;
+            display: block;
+            width: 100%;
+            border: 2px solid #66bb6a; /* Light green border */
+            border-radius: 5px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #388e3c; /* Darker green on focus */
+        }
+
+        button {
+            background-color: #66bb6a; /* Light green button */
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 1.2em;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 20px;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+
+        button:hover {
+            background-color: #388e3c; /* Darker green on hover */
+            transform: translateY(-2px);
+        }
+
+        footer {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #555;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Bird Image Classifier</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <label for="file">Upload an image:</label>
+            <input type="file" id="file" name="file" accept="image/*" required>
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+
+    <footer>
+        Powered by MobileNetV3 - Bird Classifier
+    </footer>
+
+    <script>
+        document.getElementById('uploadForm').onsubmit = function(event) {
+            event.preventDefault();
+    
+            const formData = new FormData(document.getElementById('uploadForm'));
+            const fileInput = document.getElementById('file');
+            const file = fileInput.files[0];
+    
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imageUrl = e.target.result;  // Get the uploaded image's data URL
+    
+                fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Redirect to result page, passing both prediction and image URL as query parameters
+                    window.location.href = `/result.html?prediction=${encodeURIComponent(data.prediction)}&image=${encodeURIComponent(imageUrl)}`;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            };
+            reader.readAsDataURL(file);  // Convert image to data URL
+        };
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bird Classification Result</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f1f8e9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .result-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        img {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2em;
+            color: #2e7d32;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 1.2em;
+            color: #555;
+        }
+
+        .scientific-name {
+            font-style: italic;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="result-container">
+        <h1>Classification Result</h1>
+        <img id="uploadedImage" alt="Uploaded Bird Image" />
+        <p id="predictionText"></p>
+        <p class="scientific-name" id="scientificNameText"></p>
+        <p id="descriptionText"></p>
+    </div>
+
+    <script>
+        // Function to get URL parameters
+        function getQueryParam(param) {
+            var urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        // Get the prediction and image from the URL
+        var prediction = getQueryParam('prediction');
+        var imageUrl = getQueryParam('image');
+
+        // Log them for debugging purposes
+        console.log("Prediction:", prediction);
+        console.log("Image URL:", imageUrl);
+
+        // Mock bird info database
+        const bird_info = {
+            'Asian-Green-Bee-Eater': {
+                'name': 'Asian Green Bee-Eater',
+                'scientific_name': 'Merops orientalis',
+                'description': 'This small bee-eater is found across tropical southern Asia, known for its vibrant green color and slender body. It primarily feeds on bees and other flying insects.',
+                'image': 'asian_green_bee_eater.jpg'
+            },
+            'Brown-Headed-Barbet': {
+                'name': 'Brown-Headed Barbet',
+                'scientific_name': 'Psilopogon zeylanicus',
+                'description': 'A species of barbet found in India and Sri Lanka. It is known for its distinctive brown head and striking green plumage. It nests in tree cavities.',
+                'image': 'brown_headed_barbet.jpg'
+            },
+            'Cattle-Egret': {
+                'name': 'Cattle Egret',
+                'scientific_name': 'Bubulcus ibis',
+                'description': 'A small white heron often seen in agricultural fields, typically foraging alongside cattle, buffalo, and other large mammals. Known for its symbiotic relationship with grazing animals.',
+                'image': 'cattle_egret.jpg'
+            },
+            'Common-Kingfisher': {
+                'name': 'Common Kingfisher',
+                'scientific_name': 'Alcedo atthis',
+                'description': 'A small, brightly colored kingfisher known for its sharp beak and vibrant blue and orange plumage. It dives into water to catch fish.',
+                'image': 'common_kingfisher.jpg'
+            },
+            'Common-Myna': {
+                'name': 'Common Myna',
+                'scientific_name': 'Acridotheres tristis',
+                'description': 'A highly adaptable bird found across Asia. It thrives in urban and suburban areas, known for its loud calls and mimicry abilities.',
+                'image': 'common_myna.jpg'
+            },
+            'Common-Rosefinch': {
+                'name': 'Common Rosefinch',
+                'scientific_name': 'Carpodacus erythrinus',
+                'description': 'A small, seed-eating bird found across Europe and Asia. The males are known for their rosy-red plumage, especially during the breeding season.',
+                'image': 'common_rosefinch.jpg'
+            },
+            'Common-Tailorbird': {
+                'name': 'Common Tailorbird',
+                'scientific_name': 'Orthotomus sutorius',
+                'description': 'A small warbler-like bird, famous for its unique ability to stitch leaves together to create its nest. Found in gardens and shrublands across Asia.',
+                'image': 'common_tailorbird.jpg'
+            },
+            'Coppersmith-Barbet': {
+                'name': 'Coppersmith Barbet',
+                'scientific_name': 'Psilopogon haemacephalus',
+                'description': 'A small bird with a metallic "tuk-tuk-tuk" call, reminiscent of a coppersmith at work. It has a distinctive red forehead and throat.',
+                'image': 'coppersmith_barbet.jpg'
+            },
+            'Forest-Wagtail': {
+                'name': 'Forest Wagtail',
+                'scientific_name': 'Dendronanthus indicus',
+                'description': 'A migratory bird that inhabits forests, known for its distinct tail-wagging behavior. It can often be seen foraging on the forest floor for insects.',
+                'image': 'forest_wagtail.jpg'
+            },
+            'Gray-Wagtail': {
+                'name': 'Gray Wagtail',
+                'scientific_name': 'Motacilla cinerea',
+                'description': 'A slender, long-tailed bird commonly found near rivers and streams. It has a distinctive yellow underbelly and constantly wags its tail.',
+                'image': 'gray_wagtail.jpg'
+            },
+            'Hoopoe': {
+                'name': 'Hoopoe',
+                'scientific_name': 'Upupa epops',
+                'description': 'A striking bird known for its long, curved beak and its vibrant crest of feathers. It feeds on insects and grubs, often found in open areas.',
+                'image': 'hoopoe.jpg'
+            },
+            'House-Crow': {
+                'name': 'House Crow',
+                'scientific_name': 'Corvus splendens',
+                'description': 'A highly social bird commonly found in urban areas. It is an opportunistic feeder and is known for its intelligence and adaptability.',
+                'image': 'house_crow.jpg'
+            },
+            'Indian-Grey-Hornbill': {
+                'name': 'Indian Grey Hornbill',
+                'scientific_name': 'Ocyceros birostris',
+                'description': 'A large bird with a prominent curved bill, often found in forests and urban areas. It feeds on fruits, small reptiles, and insects.',
+                'image': 'indian_grey_hornbill.jpg'
+            },
+            'Indian-Peacock': {
+                'name': 'Indian Peacock',
+                'scientific_name': 'Pavo cristatus',
+                'description': 'A stunningly beautiful bird known for its iridescent blue-green plumage and spectacular tail feathers in males, which are used in courtship displays.',
+                'image': 'indian_peacock.jpg'
+            },
+            'Indian-Pitta': {
+                'name': 'Indian Pitta',
+                'scientific_name': 'Pitta brachyura',
+                'description': 'A brightly colored bird with a stout body and a distinctive call. It is often found on the forest floor searching for insects.',
+                'image': 'indian_pitta.jpg'
+            },
+            'Indian-Roller': {
+                'name': 'Indian Roller',
+                'scientific_name': 'Coracias benghalensis',
+                'description': 'A medium-sized bird with brilliant blue wings and a rolling flight display. It is commonly seen perched on wires or poles in open countryside.',
+                'image': 'indian_roller.jpg'
+            },
+            'Jungle-Babbler': {
+                'name': 'Jungle Babbler',
+                'scientific_name': 'Turdoides striata',
+                'description': 'A social bird often found in noisy flocks, known as the "Seven Sisters" due to its gregarious nature. It is found in woodlands and gardens.',
+                'image': 'jungle_babbler.jpg'
+            },
+            'Northern-Lapwing': {
+                'name': 'Northern Lapwing',
+                'scientific_name': 'Vanellus vanellus',
+                'description': 'A wader with a distinctive crest and a dramatic black-and-white wing pattern. It is often found in wetlands and marshy areas.',
+                'image': 'northern_lapwing.jpg'
+            },
+            'Red-Wattled-Lapwing': {
+                'name': 'Red-Wattled Lapwing',
+                'scientific_name': 'Vanellus indicus',
+                'description': 'A noisy bird, often seen near water bodies. Its name comes from the red wattles on either side of its beak, which are prominent features.',
+                'image': 'red_wattled_lapwing.jpg'
+            },
+            'Ruddy-Shelduck': {
+                'name': 'Ruddy Shelduck',
+                'scientific_name': 'Tadorna ferruginea',
+                'description': 'A large, orange-brown duck often found in pairs. It prefers large, open wetlands and is known for its loud calls.',
+                'image': 'ruddy_shelduck.jpg'
+            },
+            'Rufous-Treepie': {
+                'name': 'Rufous Treepie',
+                'scientific_name': 'Dendrocitta vagabunda',
+                'description': 'A member of the crow family, this bird is easily recognizable due to its bright orange and black plumage. It is found in forests and gardens.',
+                'image': 'rufous_treepie.jpg'
+            },
+            'Sarus-Crane': {
+                'name': 'Sarus Crane',
+                'scientific_name': 'Antigone antigone',
+                'description': 'The tallest flying bird in the world, known for its striking red head and gray body. It inhabits wetlands and is often seen in pairs.',
+                'image': 'sarus_crane.jpg'
+            },
+            'White-Breasted-Kingfisher': {
+                'name': 'White-Breasted Kingfisher',
+                'scientific_name': 'Halcyon smyrnensis',
+                'description': 'A large kingfisher with a vibrant blue body, brown head, and a distinctive white throat. It is found near water but also inhabits woodlands and urban areas.',
+                'image': 'white_breasted_kingfisher.jpg'
+            },
+            'White-Breasted-Waterhen': {
+                'name': 'White-Breasted Waterhen',
+                'scientific_name': 'Amaurornis phoenicurus',
+                'description': 'A marsh bird with a white face and underparts, and a dark brown back. It is often seen foraging in wetlands and rice fields.',
+                'image': 'white_breasted_waterhen.jpg'
+            },
+            'White-Wagtail': {
+                'name': 'White Wagtail',
+                'scientific_name': 'Motacilla alba',
+                'description': 'A slender bird known for its black, white, and grey plumage and its constant tail-wagging behavior. Often seen near water, searching for insects.',
+                'image': 'white_wagtail.jpg'
+            }
+        };
+        
+
+        // Display the prediction, image, and additional info
+        if (prediction && imageUrl) {
+            document.getElementById('predictionText').textContent = "This is a " + prediction + " bird.";
+            document.getElementById('uploadedImage').src = imageUrl;
+
+            // Get bird information based on prediction
+            if (bird_info[prediction]) {
+                document.getElementById('scientificNameText').textContent = "Scientific Name: " + bird_info[prediction].scientific_name;
+                document.getElementById('descriptionText').textContent = bird_info[prediction].description;
+            } else {
+                document.getElementById('scientificNameText').textContent = "";
+                document.getElementById('descriptionText').textContent = "No detailed information available.";
+            }
+        } else {
+            document.getElementById('predictionText').textContent = "No prediction data available.";
+        }
+    </script>
+
+</body>
+</html>
+{% comment %} <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bird Classifier</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to right, #e0f7fa, #a7ffeb);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #444;
+        }
+
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        h1 {
+            color: #388e3c;
+            font-size: 2em;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        input[type="file"] {
+            margin: 20px 0;
+            padding: 10px;
+            font-size: 1em;
+            width: 100%;
+            border: 2px solid #66bb6a;
+            border-radius: 5px;
+        }
+
+        button {
+            background-color: #66bb6a;
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 1.2em;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #388e3c;
+        }
+
+        #output {
+            margin-top: 20px;
+        }
+
+        img {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 10px;
+        }
+
+        .prediction {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #555;
+        }
+
+        .scientific-name {
+            font-style: italic;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Bird Classifier</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="file" id="file" name="file" accept="image/*" required>
+            <button type="submit">Submit</button>
+        </form>
+        <div id="output">
+            <img id="uploadedImage" alt="Uploaded Image" style="display: none;">
+            <div id="prediction" class="prediction"></div>
+            <div id="scientificName" class="scientific-name"></div>
+            <div id="description"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').onsubmit = function(event) {
+            event.preventDefault();
+
+            const formData = new FormData(document.getElementById('uploadForm'));
+            const fileInput = document.getElementById('file');
+            const file = fileInput.files[0];
+
+            // Display uploaded image
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imageUrl = e.target.result;
+                const uploadedImage = document.getElementById('uploadedImage');
+                uploadedImage.src = imageUrl;
+                uploadedImage.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            // Send image to server
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const birdInfo = {
+                    'Asian-Green-Bee-Eater': {
+                        name: 'Asian Green Bee-Eater',
+                        scientific_name: 'Merops orientalis',
+                        description: 'This small bee-eater is found across tropical southern Asia, known for its vibrant green color and slender body. It primarily feeds on bees and other flying insects.'
+                    }
+                };
+
+                const prediction = data.prediction;
+                const output = document.getElementById('output');
+                const predictionDiv = document.getElementById('prediction');
+                const scientificNameDiv = document.getElementById('scientificName');
+                const descriptionDiv = document.getElementById('description');
+
+                // Display prediction and bird info
+                predictionDiv.textContent = "Prediction: " + prediction;
+                if (birdInfo[prediction]) {
+                    scientificNameDiv.textContent = "Scientific Name: " + birdInfo[prediction].scientific_name;
+                    descriptionDiv.textContent = birdInfo[prediction].description;
+                } else {
+                    scientificNameDiv.textContent = "";
+                    descriptionDiv.textContent = "No detailed information available.";
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('prediction').textContent = "Error in prediction.";
+            });
+        };
+    </script>
+
+</body>
+</html> {% endcomment %}
